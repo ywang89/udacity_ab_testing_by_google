@@ -1,0 +1,636 @@
+---
+title: "Notes of A/B Testing by Google"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      smooth_scroll: false
+---
+
+```{r, setup, echo=FALSE, results='hide', message=FALSE}
+library(tidyverse)
+knitr::opts_knit$set(root.dir = "~/Desktop/udacity/ab_testing_by_google/")
+```
+
+# Lesson 1
+
+Important concepts:
+
+* What is "Pracitical Significance"?
+* What is "Power"?
+* What is the difference between one tailed test and two tailed test?
+* What is click-through-probability?
+    * For each page view, match it to all the child clicks, and count at most 1 click
+    * Sum of number of clicks divided by sum of page views
+
+## 22
+
+* $\alpha$ is type I error
+* $\beta$ is type II error
+* $Power = 1 - \beta$
+
+Power is also called **sensitivity**, in the context of binary classification.
+
+Important concepts:
+
+* How is sample size calculated?
+
+A helpful article on this topic is from twitter's engineering blog^[See the link in Appendix].
+
+Relevant videos to this subsection are at [khan academy, significance testing lessons](https://www.khanacademy.org/math/ap-statistics/tests-significance-ap/error-probabilities-power/v/introduction-to-power-in-significance-tests).
+
+## 24
+
+How does practical significance affect page size?
+
+* A helpful article on this topic is from twitter's enginerring blog^[See the link in Appendix].
+
+## 25
+```{r, lesson1_sec25}
+n.cont = 10072
+x.cont = 974
+p.cont = x.cont / n.cont
+
+n.exp = 9886
+x.exp = 1242
+p.exp = x.exp / n.exp
+
+p.all = (x.cont + x.exp) / (n.cont + n.exp)
+
+d.hat = p.exp - p.cont
+moe = qnorm(0.975) * sqrt(p.all * (1-p.all) * (1 / n.cont + 1 / n.exp))
+
+bdry = d.hat + c(-1, 1) * moe
+round(bdry, 4)
+```
+
+# Lesson 3
+
+## 16
+
+For below 3 distributions: 
+
+* Poisson (understand this first)
+* Exponential
+* Pareto
+
+We wanted to understand:
+
+* What phenomena do they describe?
+* What are their density formulae?
+* How to plot them out in R?
+
+## 22
+
+Here is the quiz data for you to copy and paste: [87029, 113407, 84843, 104994, 99327, 92052, 60684]
+
+```{r, lesson3_sec22}
+s.1 = c(87029, 113407, 84843, 104994, 99327, 92052, 60684)
+se = sd(s.1) / sqrt(length(s.1))
+
+result.22 =  mean(s.1) + c(-1, 1) * qnorm(0.975) * se
+result.22
+```
+
+## 27
+
+Data contains click-through-probability values from 40 A/A Tests or bootstrap samples.
+
+Notes:
+
+* To calculate empirical variance, for each group, sample size of each experiment needs to remain the same. This is because standard error is dependent on sample size.
+
+```{r, lesson3_sec27}
+df.q27 = read.table("data/data_l3_q27.csv", header = TRUE, 
+                    na.strings = c(""), stringsAsFactors = FALSE)
+
+df.q27 = df.q27 %>%
+  mutate(diff = Group.1 - Group.2)
+# 1. calculate the standard deviation of the differences, 
+# and assume metric is normally distributed
+bdry.22.1 = round(mean(df.q27$diff) + qnorm(0.975) * sd(df.q27$diff) * c(-1, 1),
+                  4)
+
+# 2. calculate an empirical confidence interval,
+# making no assumptions about the distribution
+diffs = sort(df.q27$diff, decreasing = FALSE)
+bdry.22.2 = c(diffs[2], diffs[39])
+
+bdry.22.1
+bdry.22.2
+```
+
+# Lesson 4
+
+Important concepts:
+
+* What is unit of diversion? It is by what unit is the sampling being done. For example, suppose there is an A/B testing on the impact of a website changing its UI after user login. For this testing:
+
+    + If the unit of diversion is "Cookie", then events will be sampled at cookie level. i.e., events under the same cookie will always be in the same group. This ensures the same cookie gets the consistent experience (whether it be Control or Experiment).
+    + If the unit of diversion is "User ID", then events will be sampled at user id level. The rationale here is similar to "Cookie".
+    + If the unit of diversion is "Event", then events will be sampled at event level. This means that the same cookie or user id may get into control group one time, and experiment group the next time.
+
+In this case, a unit of diversion can be either "Cookie" or "User ID", but cannot be "Event".
+
+## 5
+
+What are the relationships among "event", "cookie", and "user id"?
+
+My understanding is that:
+
+* A user id can have multiple events.
+* A cookie can have multiple events.
+* A cookie is unique to each browser, ananymous, and do not require user log in.
+
+## 9
+
+Unit of diversion should be "larger" than unit of analysis.
+
+Why empirical variability is different from analytical variability when unit of analysis is different from unit of diversion?
+
+*Answer:*
+
+This is because why unit of diversion is "larger" than unit of analysis, the sampled events are more correlated with each other than when unit of diversion equal to unit of analysis.
+
+Use click-through rate as an example:
+
+1. Unit of analysis is pageview.
+2. Choosing cookie as unit of diversion means that events (a pageview) are sampled not at event level, but at cookie level.
+3. As a result, sampled pageviews are not independent from each other, because one cookie can have multiple pageviews. All pageviews in the cookie are correlated with each other, and not independent.
+
+Why variance is larger when sampling is not independent?
+
+## 10
+
+3 types of experiments:
+
+* Inter-user experiment (main topic in a/b testing)
+* Intra-user experiment
+* Interleaved experiment (usually relevant in re-ordering a list)
+
+## 12
+
+```{r, lesson4_sec12}
+# new zealand
+nz.n.cont = 6021
+nz.x.cont = 302
+nz.p.cont = nz.x.cont / nz.n.cont
+
+nz.n.exp = 5979
+nz.x.exp = 374
+nz.p.exp = nz.x.exp / nz.n.exp
+
+nz.p.all = (nz.x.cont + nz.x.exp) / (nz.n.cont + nz.n.exp)
+nz.se = sqrt(nz.p.all * (1 - nz.p.all) * (1 / nz.n.cont + 1 / nz.n.exp))
+
+# other
+other.n.cont = 5e4
+other.x.cont = 2500
+other.p.cont = other.x.cont / other.n.cont
+
+other.n.exp = 5e4
+other.x.exp = 2500
+other.p.exp = other.x.exp / other.n.exp
+
+# global
+gl.n.cont = nz.n.cont + other.n.cont
+gl.x.cont = nz.x.cont + other.x.cont
+gl.p.cont = gl.x.cont / gl.n.cont
+
+gl.n.exp = nz.n.exp + other.n.exp
+gl.x.exp = nz.x.exp + other.x.exp
+gl.p.exp = gl.x.exp / gl.n.exp
+
+gl.p.all = (gl.x.cont + gl.x.exp) / (gl.n.cont + gl.n.exp)
+
+# question 1
+gl.se = sqrt(gl.p.all * (1 - gl.p.all) * (1 / gl.n.cont + 1 / gl.n.exp))
+gl.se
+
+# question 2
+(1 - pnorm(abs(nz.p.cont - nz.p.exp) / nz.se)) * 2 < 0.05
+(1 - pnorm(abs(gl.p.cont - gl.p.exp) / gl.se)) * 2 < 0.05
+
+```
+
+## 18
+
+Important concepts:
+
+* How is number of pages calculated?
+    * How is power formula derived?
+    
+A helpful article on this topic is from twitter's engineering blog^[See the link in Appendix].
+
+# Lesson 5
+
+## 6
+
+If the population's portion of control group is 0.5, then the sample portion follows a normal distribution $N(0.5, 0.5 * (1-0.5) / n)$, where $n$ is the sample size.
+
+```{r, lesson5_sec6}
+n.cont.q5.6 = 15348
+n.exp.q5.6 = 15312
+
+p.hat = n.cont.q5.6 / (n.exp.q5.6 + n.cont.q5.6)
+round(
+  0.5 + 
+  c(-1, 1) * qnorm(0.975) * 
+  sqrt(0.5 * 0.5 * 1 / (n.exp.q5.6 + n.cont.q5.6)), 4)
+
+```
+
+## 9
+
+What's the reason that empirically standard error can be derived?
+$$\frac{0.0035}{\sqrt{\frac{1}{10000} + \frac{1}{10000}}} = 
+\frac{se}{\sqrt{\frac{1}{7370} + \frac{1}{7270}}}$$
+
+```{r, lesson5_sec9_1}
+Xs_cont = c(196, 200, 200, 216, 212, 185, 225, 187, 205, 211, 192, 196, 223, 192)
+Ns_cont = c(2029, 1991, 1951, 1985, 1973, 2021, 2041, 1980, 1951, 1988, 1977, 2019, 2035, 2007)
+Xs_exp = c(179, 208, 205, 175, 191, 291, 278, 216, 225, 207, 205, 200, 297, 299)
+Ns_exp = c(1971, 2009, 2049, 2015, 2027, 1979, 1959, 2020, 2049, 2012, 2023, 1981, 1965, 1993)
+
+x.total.cont = sum(Xs_cont)
+n.total.cont = sum(Ns_cont)
+x.total.exp = sum(Xs_exp)
+n.total.exp = sum(Ns_exp)
+
+ctr.cont = x.total.cont / n.total.cont
+ctr.exp = x.total.exp / n.total.exp
+
+# calculate empirical variance
+emp.se = 0.0062 * sqrt(1/n.total.cont + 1/n.total.exp) / sqrt(1/5000 + 1/5000)
+
+# calculate confidence intervals
+emp.ci = round((ctr.exp - ctr.cont) + c(-1, 1) * qnorm(0.975) * emp.se, 4)
+```
+
+Zero is not included in the confidence interval, so the result is significant. However, $d_{min}(0.01)$ is included in it, so we can't be 95% confident the difference are substantive.
+
+```{r, lesson5_sec9_2}
+# sign test
+## define a function
+calc.sign.test = function(n.success, size, prob.success, is.two.tail){
+  # calculates p value for a binomial distribution
+  # arg:
+  #     n.success: an integer, number of successes
+  #     size: an integer, number of trials
+  #     prob.success: a double, probability of "success" on each trial
+  #     is.two.tail: a logical, TRUE or FALSE
+  # return:
+  #     p-value: probability of events at least as extreme as n.success
+  if(is.two.tail){
+    return(round((1 - pbinom(n.success - 1, size = size, prob = prob.success)) + 
+             pbinom(size - n.success, size = size, prob = prob.success), 4))
+  }
+}
+
+## define "success" as experiment group has higher CTR than control group
+n.success = sum((Xs_exp / Ns_exp - Xs_cont / Ns_cont) > 0)
+size = length(Xs_cont)
+
+## calculate the 2 tail p value
+calc.sign.test(n.success, size, prob.success = 0.5, is.two.tail = TRUE)
+
+```
+
+After going to the [online calculator](https://www.graphpad.com/quickcalcs/binomial2/), below are the results. The 2 tail p value is the same as what is calculated above.
+
+Sign and binomial test:
+
+* Number of "successes": 9 
+* Number of trials (or subjects) per experiment: 14 
+* Sign test. If the probability of "success" in each trial or subject is 0.500, then:
+* The one-tail P value is 0.2120 
+* This is the chance of observing 9 or more successes in 14 trials.
+* The two-tail P value is 0.4240 
+* This is the chance of observing either 9 or more successes, or 5 or fewer successes, in 14 trials.
+
+## 11
+
+CTR is higher in experiment group for both new and experienced users, but overall CTR is lower in the experiment group.
+
+Simpson's Paradox explained using vectors: [explanation](https://en.wikipedia.org/wiki/Simpson%27s_paradox#Vector_interpretation)
+
+## 12
+
+Refernce on an important concept: [Multiple comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem)
+
+## 13
+
+Why is overall alpha overestimated if the metrics are not independent?
+
+```{r, lesson5_sec13}
+# define a function to calculate probaility of at least one false positive
+calc.fp = function(size, ci){
+  # arg
+  # size: an integer, number of metrics
+  # ci: a double, confidence interval
+  # return
+  # result: a double, probability
+  return(round(1 - ci ^ size, 3))
+}
+
+calc.fp(10, 0.95)
+calc.fp(10, 0.99)
+
+```
+
+## 14
+
+Wikipeida reference on [Bonferroni correction](https://en.wikipedia.org/wiki/Bonferroni_correction).
+
+```{r, lesson5_sec14}
+df.q5.14 = data.frame(metric = c("ctp to cource overview",
+                                 "avg time spent reading overview",
+                                 "prob of enrolling",
+                                 "avg time in classroom during first week"),
+                      delta = c(0.03, -0.5, 0.01, 10),
+                      se = c(0.013, 0.21, 0.0045, 6.85))
+
+df.q5.14 =
+  df.q5.14 %>%
+  mutate(p.value = (1 - pnorm(abs(delta) / se)) * 2,
+         sig.flag = ifelse(p.value < 0.05, TRUE, FALSE),
+         sig.flag.bonf = ifelse(p.value < 0.05 / 4, TRUE, FALSE))
+```
+
+## 15
+
+A few important concepts and their wikipedia references:
+
+- [Family wise error rate](https://en.wikipedia.org/wiki/Family-wise_error_rate)
+- [False discovery rate](https://en.wikipedia.org/wiki/False_discovery_rate)
+- [Holm-Bonferroni method](https://en.wikipedia.org/wiki/Holm–Bonferroni_method#Example)
+
+## 16
+
+An OEC is an overall evaluation criterion.
+
+How do we decide if we want to launch the change or not?
+
+*Answer:*
+
+We need to ask ourselves a few questions:
+
+* Do we have statistically significant and practically significant results?
+* What the change has actually done with regard to user experience?
+* Is it worth it?
+
+It's important to remember that the end goal is to **make that recommendation based on our judgements**. Designing experiments, running experiments, etc., are all signposts towards the end goal.
+
+# Final Project
+
+## Quiz 4
+
+Below are rough estimates of the baseline values for these metrics:
+
+* Unique cookies to view course overview page per day:	40000
+* Unique cookies to click "Start free trial" per day:	3200
+* Enrollments per day:	660
+* Click-through-probability on "Start free trial":	0.08
+* Probability of enrolling, given click:	0.20625
+* Probability of payment, given enroll:	0.53
+* Probability of payment, given click: 0.1093125
+
+```{r, final_project_quiz4}
+se.gc = sqrt(0.20625 * (1-0.20625) / (5000 * 0.08))
+se.r = sqrt(0.53 * (1-0.53)/(5000 * 0.08 * 0.20625))
+se.nc = sqrt(0.1093125 * (1-0.1093125) / (5000 * 0.08))
+
+lapply(list(gross_converion = se.gc, retention = se.r,
+            net_conversion = se.nc), function(x) round(x, 4))
+```
+
+## Quiz 5
+
+Used this [calculator](http://www.evanmiller.org/ab-testing/sample-size.html)
+
+```{r, final_project_quiz5}
+n.gc = 25835; n.r = 39115; n.rc = 27411;
+# n.total.pg = (max(c(n.gc, n.r / 0.20625, n.rc)) / 0.08) * 2
+n.total.pg = (max(c(n.gc, n.rc)) / 0.08) * 2
+
+```
+
+## Quiz 6
+
+```{r, final_project_quiz6}
+p = 1
+
+n.total.pg / (40000 * p)
+
+```
+
+## Quiz 7
+
+```{r, final_project_quiz7}
+df.fp.cont = read.csv("data/Final Project Results - Control.csv",
+                      header = TRUE, na.strings = c(""), stringsAsFactors = FALSE)
+
+df.fp.exp = read.csv("data/Final Project Results - Experiment.csv",
+                      header = TRUE, na.strings = c(""), stringsAsFactors = FALSE)
+
+df.fp.cont = df.fp.cont %>%
+  mutate(Date = as.Date(Date, format = "%a, %b %d"))
+
+df.fp.exp = df.fp.exp %>%
+  mutate(Date = as.Date(Date, format = "%a, %b %d"))
+```
+
+### Number of cookies
+
+```{r, final_project_quiz7_1}
+n.fp.nc.cont = sum(df.fp.cont$Pageviews)
+n.fp.nc.exp = sum(df.fp.exp$Pageviews)
+
+p.fp.nc = round(
+  n.fp.nc.cont / (n.fp.nc.cont + n.fp.nc.exp), 4)
+
+ci.fp.nc = round(
+  0.5 + 
+  c(-1, 1) * qnorm(0.975) * sqrt(0.5 * (1-0.5) / (n.fp.nc.cont + n.fp.nc.exp)),
+  4)
+
+cat("\nobserved: ", p.fp.nc, 
+    "\nupper: ", max(ci.fp.nc), "\tlower: ", min(ci.fp.nc))
+
+if(p.fp.nc <= min(ci.fp.nc) | p.fp.nc >= max(ci.fp.nc)) {
+  cat("significant")
+} else {
+  cat("not significant")
+}
+
+```
+
+### Number of clicks on "start free trial"
+
+```{r, final_project_quiz7_2}
+n.fp.clk.cont = sum(df.fp.cont$Clicks)
+n.fp.clk.exp = sum(df.fp.exp$Clicks)
+
+p.fp.clk = round(
+  n.fp.clk.cont / (n.fp.clk.cont + n.fp.clk.exp), 4)
+
+ci.fp.clk = round(
+  0.5 + 
+  c(-1, 1) * qnorm(0.975) * sqrt(0.5 * (1-0.5) / (n.fp.clk.cont + n.fp.clk.exp)),
+  4)
+
+cat("\nobserved: ", p.fp.clk, 
+    "\nupper: ", max(ci.fp.clk), "\tlower: ", min(ci.fp.clk))
+
+if(p.fp.clk <= min(ci.fp.clk) | p.fp.clk >= max(ci.fp.clk)) {
+  cat("significant")
+} else {
+  cat("not significant")
+}
+
+```
+
+### Click-through-probability on "start free trial"
+
+Why the answer doesn't consider this metric as an invariant metric?
+
+```{r, final_project_quiz7_3}
+p.fp.ctp.cont = sum(df.fp.cont$Clicks) / sum(df.fp.cont$Pageviews)
+p.fp.ctp.exp = sum(df.fp.exp$Clicks) / sum(df.fp.exp$Pageviews)
+p.fp.ctp.both = 
+  sum(df.fp.cont$Clicks, df.fp.exp$Clicks) / 
+  sum(df.fp.cont$Pageviews, df.fp.exp$Pageviews)
+
+ci.fp.ctp = 
+  round((p.fp.ctp.exp - p.fp.ctp.cont) +
+          c(-1, 1) * qnorm(0.975) * 
+          sqrt(p.fp.ctp.both *
+                 (1 - p.fp.ctp.both) *
+                 (1 / n.fp.nc.cont + 1 / n.fp.nc.exp)), 5)
+
+p.fp.ctp.delta = round(p.fp.ctp.exp - p.fp.ctp.cont, 5)
+
+cat("\nobserved: ", p.fp.ctp.delta, 
+    "\nupper: ", max(ci.fp.ctp), "\tlower: ", min(ci.fp.ctp))
+
+if(p.fp.ctp.delta <= min(ci.fp.ctp) | p.fp.ctp.delta >= max(ci.fp.ctp)) {
+  cat("significant")
+} else {
+  cat("not significant")
+}
+```
+
+## Quiz 8
+
+Remove rows that don't have enrollments or payments data.
+
+```{r, final_project_quiz8}
+df.fp.cont.2 = df.fp.cont %>% na.omit()
+df.fp.exp.2 = df.fp.exp %>% na.omit()
+```
+
+### Gross Conversion
+
+Why does the answer consider this as practically significant?
+
+```{r, final_project_quiz8_1}
+n.fp.enroll.cont = sum(df.fp.cont.2$Enrollments)
+n.fp.enroll.exp = sum(df.fp.exp.2$Enrollments)
+
+n.fp.clk.cont.2 = sum(df.fp.cont.2$Clicks)
+n.fp.clk.exp.2 = sum(df.fp.exp.2$Clicks)
+
+p.fp.gc.cont = n.fp.enroll.cont / n.fp.clk.cont.2
+p.fp.gc.exp = n.fp.enroll.exp / n.fp.clk.exp.2
+p.fp.gc.both = 
+  (n.fp.enroll.cont + n.fp.enroll.exp) / 
+  (n.fp.clk.cont.2 + n.fp.clk.exp.2)
+
+ci.fp.gross.conv = 
+  round((p.fp.gc.exp - p.fp.gc.cont) + c(-1, 1) * qnorm(0.975) *
+          sqrt(p.fp.gc.both * 
+                 (1-p.fp.gc.both)*
+                 (1 / n.fp.clk.cont.2 + 1 / n.fp.clk.exp.2)), 4)
+
+ci.fp.gross.conv
+```
+
+### Net Conversion
+
+```{r, final_project_quiz8_2}
+n.fp.payment.cont = sum(df.fp.cont.2$Payments)
+n.fp.payment.exp = sum(df.fp.exp.2$Payments)
+
+p.fp.net.conv.cont = n.fp.payment.cont / n.fp.clk.cont.2
+p.fp.net.conv.exp = n.fp.payment.exp / n.fp.clk.exp.2
+p.fp.net.conv.both = 
+  (n.fp.payment.cont + n.fp.payment.exp) / 
+  (n.fp.clk.cont.2 + n.fp.clk.exp.2)
+
+ci.fp.net.conv = 
+  round((p.fp.net.conv.exp - p.fp.net.conv.cont) + c(-1, 1) * qnorm(0.975) *
+          sqrt(p.fp.net.conv.both * 
+                 (1-p.fp.net.conv.both) *
+                 (1 / n.fp.clk.cont.2 + 1 / n.fp.clk.exp.2)), 4)
+
+ci.fp.net.conv
+```
+
+## Quiz 9
+
+```{r, final_project_quiz9}
+## define a function
+calc.sign.test = function(n.success, size, prob.success, is.two.tail){
+  # calculates p value for a binomial distribution
+  # arg:
+  #     n.success: an integer, number of successes
+  #     size: an integer, number of trials
+  #     prob.success: a double, probability of "success" on each trial
+  #     is.two.tail: a logical, TRUE or FALSE
+  # return:
+  #     p-value: probability of events at least as extreme as n.success
+  if(is.two.tail){
+    return(round((1 - pbinom(n.success - 1, size = size, prob = prob.success)) + 
+             pbinom(size - n.success, size = size, prob = prob.success), 4))
+  }
+}
+```
+
+### Gross Conversion
+
+```{r, final_project_quiz9_1}
+## define "success" as experiment group has higher values than control group
+n.fp.gc.success = sum((df.fp.cont.2$Enrollments / df.fp.cont.2$Clicks - 
+                   df.fp.exp.2$Enrollments / df.fp.exp.2$Clicks) > 0)
+
+## calculate the 2 tail p value
+calc.sign.test(n.success = n.fp.gc.success, size = dim(df.fp.cont.2)[1],
+               prob.success = 0.5, is.two.tail = TRUE)
+
+```
+
+### Net Conversion
+
+```{r, final_project_quiz9_2}
+## define "success" as experiment group has higher values than control group
+n.fp.nc.success = sum((df.fp.cont.2$Payments / df.fp.cont.2$Clicks -
+                         df.fp.exp.2$Payments / df.fp.exp.2$Clicks) > 0)
+
+## calculate the 2 tail p value
+calc.sign.test(n.success = n.fp.nc.success, size = dim(df.fp.cont.2)[1],
+               prob.success = 0.5, is.two.tail = TRUE)
+
+```
+
+## Recommendation
+
+My recommendation is to not launch this experiment. The reasons are:
+
+1. There are no evidence suggesting Net Conversion rate is significantly different. As a result, revenue would not likely to increase after launching the change.
+2. Launching the change is likely to add development and maintenance cost.
+3. Based on above 2 reasons, cost would exceed revenue after launching the change.
+
+# Appendix
+1. [A note on this course on "towards data science"](https://towardsdatascience.com/a-summary-of-udacity-a-b-testing-course-9ecc32dedbb1)
+
+2. [Twitter Engineering's article on determining page size](https://blog.twitter.com/engineering/en_us/a/2016/power-minimal-detectable-effect-and-bucket-size-estimation-in-ab-tests.html)
