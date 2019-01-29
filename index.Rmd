@@ -44,7 +44,7 @@ The next step is to:
 1. Suppose $H_0$ is true.
 2. Pick and calculates the test statistic under the assumption of $H_0$ being true, e.g., x.
 
-    + Test statistic is the number of heads in 10 throw.
+    + Test statistic is the number of heads in 100 throws.
   
 3. Calculates the probability that test statistic is at least as extreme as x.
 
