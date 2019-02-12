@@ -8,7 +8,9 @@ output:
 ---
 
 ```{r, setup, echo=FALSE, results='hide', message=FALSE}
+library(plyr)
 library(tidyverse)
+library(gridExtra)
 knitr::opts_knit$set(root.dir = "~/Desktop/udacity/ab_testing_by_google/")
 ```
 
@@ -25,6 +27,8 @@ What is "Pracitical Significance"?
 What is "Power"?
 
 ### What is the difference between one tailed test and two tailed test?
+
+#### One tail test: do null hypothesis and alternative hypothesis need to be complementary?
 
 I have always been confused by the use of one-tailed test. The part confuses me is that in many places I saw that $H_0$ and $H_a$ are not complementary, e.g., $H_0$: $\mu$ = 0, $H_a$: $\mu$ < 0, rather than $H_0$: $\mu$ >= 0, $H_a$: $\mu$ < 0,
 
@@ -76,6 +80,127 @@ As $\theta$ gets smaller, the density function moves more and more left. This me
 If the test statistic is, for example, 57, then we cannot reject $H_0$, because although under d2, d3... scenarios the result is extreme, it is not extreme when under d1 scenario. As a result, we cannot reject $H_0$.
 
 So based on my current understaning, $H_0$ and $H_a$ should be complementary, but we only need to calculate test statistic under the assumption when null hypothesis takes the equal sign.
+
+### Should we use t-test or z-test in hypothesis testing when comparing difference of means of 2 populations?
+
+I have also been confused on this point. My understanding is **in theory we should use t-test**. However, if sample size is large enough, **using either t-test or z-test would be OK**.
+
+Below is a example for clarification.
+
+Suppose there are 2 populations, X and Y. The population means $\mu_1$ and $\mu_2$ are both 5, and the population variance are both 4 (i.e., population standard deviation $\sigma$ is 2). Since in reality often we don't know population means, as a result we'd like to test if population means are truly the same.
+
+For each population, we draw samples with size of 5^[The reason we choose such small sample sizes is so that the difference between distributions of statistics are more obvious.], and we do this 1e5 times. This way we can get the sample mean and sample standard deviantion for all 1e5 draws.
+
+```{r lesson1_example2_pt1}
+s.ids = as.list(1:1e5)
+
+GenerateSample = function(id, s.size = 30, pop.mean = 5, pop.sd = 2){
+  sampling = rnorm(s.size, pop.mean, pop.sd)
+  return(data.frame(sample_id = id,
+                    value = sampling))
+}
+
+df.samples.1 = ldply(s.ids, function(x) GenerateSample(x, s.size = 5))
+df.samples.2 = ldply(s.ids, function(x) GenerateSample(x, s.size = 5))
+
+df.s.stats.1 = 
+  df.samples.1 %>% 
+  group_by(sample_id) %>%
+  summarise(sample_mean = mean(value),
+            sample_sd = sd(value),
+            sample_size = n())
+
+df.s.stats.2 = 
+  df.samples.2 %>% 
+  group_by(sample_id) %>%
+  summarise(sample_mean = mean(value),
+            sample_sd = sd(value),
+            sample_size = n())
+```
+
+The normal process of a hypothesis testing would be as follows:
+
+1. Consturct $H_0$ ($\mu_1 = \mu_2$) and $H_a$ ($\mu_1 \neq \mu_2$).
+2. Assuming $H_0$ is correct, we construct test statistics. 
+3. Calculate the statistics' values.
+
+The answer to the question of whether to use t-test or z-test actually depends on whether distributions of test statistics follow t-distribution or z-distribution. Ideally we would like to construct below statistic, where $Var_1$, $Var_2$ are population variances; $n_1$, $n_2$ are sample sizes:
+
+$$
+stat_1 = \dfrac {(\bar X - \bar Y) - (\mu_1 - \mu_2)}{\sqrt{\dfrac{Var_1}{n_1} + \dfrac{Var_2}{n_2}}}
+$$
+  
+However, more often than not we don't know what are the values of population variances. In that case, we construct below statistic, where sample variances $S_x^2$ and $S_y^2$ are used to estimate $Var_1$ and $Var_2$: 
+  
+$$
+stat_2 = \dfrac {(\bar X - \bar Y) - (\mu_1 - \mu_2)}{\sqrt{\dfrac{S_x^2}{n_1} + \dfrac{S_y^2}{n_2}}}
+$$
+
+The distribution of $stat_1$ is clearly z-distribution (i.e., standard normal distribution). What about $stat_2$? To find out, we plot out the distributions of $stat_1$ and $stat_2$ to see what they look like.
+
+```{r lesson1_example2_pt2}
+# Construct the first test statistic.
+test.stat.1 = 
+  (df.s.stats.1$sample_mean - df.s.stats.2$sample_mean) /
+  (sqrt(2^2 / 5 + 2^2 / 5))
+
+# Construct the secondo test statistic.
+test.stat.2 = 
+  (df.s.stats.1$sample_mean - df.s.stats.2$sample_mean) /
+  (sqrt(df.s.stats.1$sample_sd^2 / 5 + df.s.stats.2$sample_sd^2 / 5))
+
+# Putting empirical density along with standard normal and student's t
+df.final = bind_rows(
+  tibble(test = "stat_1", statistic_value = test.stat.1),
+  tibble(test = "stat_2", statistic_value = test.stat.2),
+  tibble(test = "standard normal", statistic_value = rnorm(1e5)),
+  tibble(test = "student's t", statistic_value = rt(1e5, 5 + 5 -2))
+)
+
+# Plots out both histograms
+p.l1.1 = ggplot(df.final, aes(statistic_value)) +
+  geom_histogram(data = df.final %>% filter(test == "stat_1"), 
+                 binwidth = 1e-1, alpha = 0.2, fill = "red") +
+  geom_histogram(data = df.final %>% filter(test == "stat_2"), 
+                 binwidth = 1e-1, alpha = 0.2, fill = "blue") +
+  labs(title = "Histograms of 2 statistics")
+
+# Plots out both density curves
+p.l1.2 = ggplot(df.final %>% 
+                  filter(test %in% c("stat_1", "stat_2"))) +
+  geom_density(aes(statistic_value, color = test, fill = test), alpha = 0.2) +
+  labs(title = "Density curves of 2 statistics")
+
+grid.arrange(p.l1.1, p.l1.2, ncol = 2)
+```
+
+We can see that the 2 distributions differ slightly. Next we compare the $stat_1$ with a standard normal distribution and $stat_2$ with a t-distribution.
+
+```{r lesson1_example2_pt3}
+# Compare statistic with standard normal distribution
+p.l1.3 = ggplot(df.final %>% 
+                  filter(test %in% c("stat_1", "standard normal"))) +
+  geom_density(aes(statistic_value, color = test, fill = test), alpha = 0.2)
+
+p.l1.3
+```
+
+``` {r lesson1_example2_pt4}
+# Compare statistic with student t distribution
+p.l1.4 = ggplot(df.final %>% 
+                  filter(test %in% c("stat_2", "student's t"))) +
+  geom_density(aes(statistic_value, color = test, fill = test), alpha = 0.2)
+
+p.l1.4
+```
+
+As we can see. The $stat_1$ statistic follows a standardized normal distribution, and $stat_2$ statistic follows a student t's distribution with a degree of freedom of 8 (How is degree of freedom determined? We'll discuss that shortly). 
+
+If sample size were larger (e.g., 30 instead of 5), then both $stat_1$ and $stat_2$ would follow standard normal distribution.
+
+As a conclusion, in cases where we don't know population variances, then in theory we should use t-test. However, when sample sizes are large enough, **using either t-test or z-test would be OK**.
+
+#### What is the degree of freedome of the t test statistic?
 
 ### What is click-through-probability?
 
