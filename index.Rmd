@@ -290,13 +290,44 @@ What is click-through-probability?
 
 Power is also called **sensitivity**, in the context of binary classification.
 
-Important concepts:
+### Important concepts
 
-* How is sample size calculated?
+#### How is sample size calculated?
 
-A helpful article on this topic is from twitter's engineering blog^[See the link in Appendix].
+To determine a minimum sample size, we need to think about what are the different things that can determine a sample size for an A/B testing? Often there are a few things like below:
 
-Relevant videos to this subsection are at [khan academy, significance testing lessons](https://www.khanacademy.org/math/ap-statistics/tests-significance-ap/error-probabilities-power/v/introduction-to-power-in-significance-tests).
+* Type I error is 5%.
+* Power is 80%. Since Power = 1 - Type II error, so in other words, Type II error = 20%.
+* A Minimum Detectable Effect (MDE) of some value $X$; in the course this was called **"practical significance level" and "substantive significance level"**. What is this specifically? Suppose we are testing a metric. We have $\mu_{con}$ and $\mu_{exp}$ which are the population mean of control group and experiment group respectively. We define delta as $\delta = \hat \mu_{exp} - \hat \mu_{con}$, which is the difference of the sample means. So $\delta$ follows a normal distribution. If $H_0$ is true, then $\delta$ follows a normal distribution with mean equal to zero. If $H_0$ is not true, then $\delta$ follows a normal distribution with mean equal to MDE.
+
+To better illustrate the idea, we use a one-sided test and draw below charts.
+
+```{r lesson1_sec22_code1}
+delta.1 = seq(-5,8,by = 0.1)
+
+df.l1.s22.1 = tibble(delta = c(delta.1, delta.1),
+                     density = c(dnorm(delta.1),
+                                 dnorm(delta.1, mean = 3)),
+                     scenario = c(rep("H0 is true", length(delta.1)), 
+                                  rep("H0 is false", length(delta.1))))
+
+p.l1.6 = 
+  ggplot(df.l1.s22.1, aes(delta, density, fill = scenario, color = scenario)) + 
+  geom_line() +
+  geom_vline(xintercept=0, color = "blue") + 
+  geom_vline(xintercept = 3, color = "red") +
+  geom_vline(xintercept = 1.64, color = "green")
+
+p.l1.6
+```
+
+The left curve is the density curve when $H_0$ is true, and right curve is the density curve when it's not. The blue and red vertical line represents the mean of the 2 density curves. The blue line represents 0, and red line represents MDE. The green line represents our decision cutoff point, i.e., if a measured value is greater than green line, then we reject $H_0$. The area (1) under red curve, and (2) right of green line represents Power. The area (1) under red curve, and (2) left of green line represents Type II error.
+
+As we can see, if we decided on alpha, beta and MDE beforehand, then that means blue line and red line are now fixed. To keep $\alpha = 0.05$ as sample size gets larger, the green line will move to the left and closer to blue line. This is because the standard deviation of both blue and red curves will become smaller. This also means Power becomes larger. In other words, we can increase sample size to a amount so that Power, or $1 - \beta$, increases to 80%. And that's why we can determine a sample size if we have the $\alpha$, $\beta$, and MDE.
+
+There's actually a formula for the size calculation. Details on that can be found on this very helpful article from twitter's engineering blog^[See the link in Appendix].
+
+Other relevant resources to this subsection can be found at [Khan Academy's significance testing lessons](https://www.khanacademy.org/math/ap-statistics/tests-significance-ap/error-probabilities-power/v/introduction-to-power-in-significance-tests).
 
 ## 24
 
