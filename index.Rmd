@@ -630,7 +630,15 @@ calc.fp(10, 0.99)
 
 ## 14
 
-Wikipeida reference on [Bonferroni correction](https://en.wikipedia.org/wiki/Bonferroni_correction).
+An important concept related to this quiz is **Bonferroni correction**. In a nutshell, Bonferroni Correction gives each hypothesis test a signficance level of $\alpha / m$, where $\alpha$ is the overall signifance level, and $m$ is the number of tests. The **[Wikipedia page of Bonferroni Correction]((https://en.wikipedia.org/wiki/Bonferroni_correction))** shows that this ensure **[Family Wise Error Rate](https://en.wikipedia.org/wiki/Family-wise_error_rate)** is less than $\alpha$.
+
+I feel that below notation makes the proof more easily understood for me.
+
+$$
+P\{\bigcup_{i=1}^{m_0} (|t_i| \geq |t_i^*|) \} \leq \bigcup_{i=1}^{m_0} P(|t_i| \geq |t_i^*|) = m_0 * \frac{\alpha}{m} \leq m * \frac{\alpha}{m} = \alpha
+$$
+
+The difference is that now we states that we are looking for the probability of test statistics at least as extreme as critical values, which is $\alpha / m$. In the Wikipedia page it states the probability as $P(p_i <= \alpha / m)$.
 
 ```{r, lesson5_sec14}
 df.q5.14 = data.frame(metric = c("ctp to cource overview",
