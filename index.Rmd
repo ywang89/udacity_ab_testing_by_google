@@ -11,7 +11,7 @@ output:
 library(plyr)
 library(tidyverse)
 library(gridExtra)
-knitr::opts_knit$set(root.dir = "~/Desktop/udacity/ab_testing_by_google/")
+knitr::opts_knit$set(root.dir = "~/Projects/udacity/ab_testing_by_google/")
 ```
 
 These are my notes for the [A/B Testing by Google](https://www.udacity.com/course/ab-testing--ud257) course I took on Udacity. It mainly consists of below 2 things.
@@ -98,7 +98,7 @@ Suppose there are 2 populations, X and Y. The population means are $\mu_1$ and $
 
 First we define a few parameters and statistics.
 
-``` {r lesson1_example2_pt0}
+```{r lesson1_example2_pt0}
 n.1 = 5; n.2 = 7 # define sample sizes
 trials = 1e5 # define number of trials
 mu.1 = 5; mu.2 = 5 # define population variances
@@ -107,7 +107,7 @@ sd.1 =2; sd.2 = 3 # define population standard deviations
 
 For each population, we draw samples with size of `r n.1` and `r n.2`^[The reason we choose such small sample sizes is so that the difference between distributions of statistics are more obvious.], and we do this `r as.integer(trials)` times. This way we can get the sample mean and sample standard deviantion for all `r as.integer(trials)` draws.
 
-```{r lesson1_example2_pt1}
+```{r lesson1_example2_pt1, eval=FALSE}
 s.ids = as.list(1:trials)
 
 GenerateSample = function(id, s.size = 30, pop.mean = 1, pop.sd = 0){
@@ -176,7 +176,7 @@ As we can see, the only difference between $stat_3$ and $stat_2$ is the way we e
 
 The distribution of $stat_1$ is clearly z-distribution (i.e., standard normal distribution). What about $stat_2$ and $stat_3$? To find out, we plot out the distributions of the statistics to see what they look like. Here we assume we know that population variances are unequal and we plot for $stat_2$.
 
-```{r lesson1_example2_pt2}
+```{r lesson1_example2_pt2, eval=FALSE}
 # Construct test statistic.
 test.stat.1 = 
   (df.s.stats.1$sample_mean - df.s.stats.2$sample_mean) /
@@ -213,9 +213,11 @@ p.l1.2 = ggplot(df.final %>%
 grid.arrange(p.l1.1, p.l1.2, nrow = 2)
 ```
 
+![](image/lesson1_example2_pt2.png)
+
 We can see that the 2 distributions differ slightly. Next we compare them with a standard normal distribution and a t-distribution respectively.
 
-```{r lesson1_example2_pt3}
+```{r lesson1_example2_pt3, eval=FALSE}
 # Compare statistic with standard normal distribution
 p.l1.3 = ggplot(df.final %>% 
                   filter(test %in% c("stat_1", "standard_normal"))) +
@@ -224,7 +226,9 @@ p.l1.3 = ggplot(df.final %>%
 p.l1.3
 ```
 
-``` {r lesson1_example2_pt4}
+![](image/lesson1_example2_pt3.png)
+
+```{r lesson1_example2_pt4, eval=FALSE}
 # Compare statistic with student t distribution
 p.l1.4 = ggplot(df.final %>% 
                   filter(test %in% c("stat_2", "t_dis_1", "t_dis_2"))) +
@@ -232,6 +236,8 @@ p.l1.4 = ggplot(df.final %>%
 
 p.l1.4
 ```
+
+![](image/lesson1_example2_pt4.png)
 
 As we can see. The $stat_1$ statistic follows a standardized normal distribution, and $stat_2$ statistic follows a t distribution which, based on the chart, has degrees of freedom approximately equal to `r (n.1 - 1) + (n.2 - 1)`. In hypothesis testing, we can use `r min(n.1 - 1, n.2 - 1)` degress of freedom as a conservative choice. The actual formula of degrees of freedom is mentioned later.
 
@@ -253,7 +259,7 @@ $$
 
 Since $stat_2$ is a Welch's t-test, we can calculate the d.f. for each of the sample that's drawn.
 
-``` {r lesson1_example2_pt5}
+```{r lesson1_example2_pt5, eval=FALSE}
 degree.of.freedom.stat.2 = 
   (
     (df.s.stats.1$sample_sd)^2 / df.s.stats.1$sample_size + 
@@ -273,14 +279,35 @@ p.l1.5 =
 p.l1.5
 ```
 
-We can see that d.f. ranges between `r round(min(degree.of.freedom.stat.2),2)` and `r max(degree.of.freedom.stat.2)`. The former is approximately the smaller of $n_1 - 1$ and $n_2 - 1$, and the latter is $n_1 + n_2 - 2$.
+![](image/lesson1_example2_pt5.png)
 
-### What is click-through-probability?
+We can see that d.f. ranges between 4.15 and 10. The former is approximately the smaller of $n_1 - 1$ and $n_2 - 1$, and the latter is $n_1 + n_2 - 2$.
 
-What is click-through-probability?
+## 9 & 10
+
+### What is click-through-probability? What is click-through-rate?
+
+What is click-through-probability (CTP)?
 
 * For each page view, match it to all the child clicks, and count at most 1 click
 * Sum of number of clicks divided by sum of page views
+
+CTP is to check how many users will go to the next level of page on the site. As a result, we don't want to take account of situations such as reloading or multiple clicks due to impatience.
+
+What is click-through-rate (CTR)?
+
+Click through rate is number of clicks divided by number of page views. This is to check, for example, how often users find a button to click on.
+
+## 12 & 13
+
+**Binomial distribution** is the probability distribution describing the # of successes in $n$ trials, and $p(success) = p$. Mean and variance for binomial distribution are:
+
+* Mean: $np$
+* Variance: $np(1-p)$
+
+In our case for the course, we are interested in the proportion of successes in $n$ trails. I think of it as "shrinking" the above distribution by a factor of n. The reason is that "succeeding k times out of n trials" and "k/n portion of n trials succeeded" describe the same set of events, so they have the same probability. The only difference is now we look at the distribution of a portion, which is 1/n the value of success count. 
+
+As a result, mean and variance in this case are $p$ and $\frac{p(1-p)}{n}$.
 
 ## 22
 
@@ -412,6 +439,15 @@ bdry.22.2
 
 # Lesson 4
 
+The topics consists of:
+
+* Choosing "subject", i.e., unit of diversion.
+* Choosing "population". What are the populations to run the test on?
+* Determine size.
+* Determine duration.
+
+## 2 & 3
+
 Important concepts:
 
 * What is unit of diversion? It is by what unit is the sampling being done. For example, suppose there is an A/B testing on the impact of a website changing its UI after user login. For this testing:
@@ -421,6 +457,11 @@ Important concepts:
     + If the unit of diversion is "Event", then events will be sampled at event level. This means that the same cookie or user id may get into control group one time, and experiment group the next time.
 
 In this case, a unit of diversion can be either "Cookie" or "User ID", but cannot be "Event".
+
+In the **Quiz**, I found adding below info helped me understand better:
+
+* The column headers(desktop homepage, sign in, etc.) describes event types.
+* Ultimately, events "capture" the changes. But events can be sampled at user/cookie level.
 
 ## 5
 
@@ -513,6 +554,20 @@ Important concepts:
 A helpful article on this topic is from twitter's engineering blog^[See the link in Appendix].
 
 # Lesson 5
+
+The topics covered in this lesson consists of:
+
+* Sanity checks
+* Single metric
+* Multiple metrics
+* Gotchas
+
+## 2. Sanity Checks
+
+Sanity checks consists of 2 things:
+
+1. Population sizing metrics: experiment and control should be comparable.
+2. Actual invariants: metrics that shouldn't change when running experiments.
 
 ## 6
 
